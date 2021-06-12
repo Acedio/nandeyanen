@@ -3,8 +3,8 @@
 
 typedef struct __attribute__((__packed__)) {
   char magic[4];
-  unsigned char prgLen;
-  unsigned char chrLen;
+  unsigned char prgBlocks;
+  unsigned char chrBlocks;
   unsigned char flags6;
   unsigned char flags7;
   char unused[8];
@@ -14,6 +14,8 @@ typedef struct __attribute__((__packed__)) {
 int readInesHeader(const char* rom, InesHeader *header);
 
 int prgAddr(InesHeader header);
+int prgLen(InesHeader header);
 int chrAddr(InesHeader header);
+int chrLen(InesHeader header);
 
 #endif  // INES_H

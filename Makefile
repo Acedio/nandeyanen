@@ -1,6 +1,6 @@
 all: nes
 
-nes: nes.o opcode.o ines.o
+nes: nes.o opcode.o ines.o examine.o
 	gcc -g $^ -o $@
 
 nes.o: nes.c

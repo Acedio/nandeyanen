@@ -26,7 +26,7 @@ int readInesHeader(const char* rom, InesHeader *header) {
 }
 
 int prgAddr(InesHeader header) {
-  if (header.prgLen < 1) {
+  if (header.prgBlocks < 1) {
     return -1;
   }
   if (header.flags6 & 0x04) {
@@ -37,13 +37,21 @@ int prgAddr(InesHeader header) {
   }
 }
 
+int prgLen(InesHeader header) {
+  return header.prgBlocks * 16 * 1024;
+}
+
 int chrAddr(InesHeader header) {
-  if (header.chrLen < 0) {
+  if (header.chrBlocks < 0) {
     return -1;
   }
   int prg = prgAddr(header);
   if (prg < 0) {
     return -1;
   }
-  return prgAddr(header) + header.prgLen * 16 * 1024;
+  return prgAddr(header) + prgLen(header);
+}
+
+int chrLen(InesHeader header) {
+  return header.chrBlocks * 8 * 1024;
 }
