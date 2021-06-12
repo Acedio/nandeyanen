@@ -2,14 +2,15 @@
 
 #include <stdio.h>
 #include <assert.h>
+#include <stdint.h>
 
 #include "opcode.h"
 
 // TODO: Can overflow.
-int printOp(const unsigned char *rom) {
+int printOp(const uint8_t *rom) {
   assert(rom);
 
-  unsigned char b1 = *rom;
+  uint8_t b1 = *rom;
 
   int op = opcodes[b1].op;
   int addrMode = opcodes[b1].addrMode;
@@ -36,8 +37,8 @@ int printOp(const unsigned char *rom) {
 }
 
 // Returns bytes read.
-int printOps(const char *rom, const char *romEnd, int numOps) {
-  const char *start = rom;
+int printOps(const uint8_t *rom, const uint8_t *romEnd, int numOps) {
+  const uint8_t *start = rom;
   for (; rom < romEnd && numOps > 0; --numOps) {
     int b = printOp(rom);
     if (b < 1) {
@@ -77,8 +78,8 @@ int getHex(int *out) {
   }
   return 1;
 }
-void examineRom(const char *rom, int romLen) {
-  const char *cur = rom;
+void examineRom(const uint8_t *rom, int romLen) {
+  const uint8_t *cur = rom;
   while (1) {
     printf("; @0x%04X\n", cur - rom);
     if (feof(stdin)) {

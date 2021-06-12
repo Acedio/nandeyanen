@@ -3,7 +3,7 @@
 #include <malloc.h>
 #include <string.h>
 
-int readInesHeader(const char* rom, InesHeader *header) {
+int readInesHeader(const uint8_t* rom, InesHeader *header) {
   if (rom == NULL || header == NULL) {
     return 0;
   }

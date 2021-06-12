@@ -1,12 +1,14 @@
 #ifndef EXAMINE_H
 #define EXAMINE_H
 
-// Returns bytes read.
-int printOp(const unsigned char *rom);
+#include <stdint.h>
 
 // Returns bytes read.
-int printOps(const char *rom, const char *romEnd, int numOps);
+int printOp(const uint8_t *rom);
 
-void examineRom(const char *rom, int romLen);
+// Returns bytes read.
+int printOps(const uint8_t *rom, const uint8_t *romEnd, int numOps);
+
+void examineRom(const uint8_t *rom, int romLen);
 
 #endif  // EXAMINE_H

@@ -1,6 +1,8 @@
 #ifndef INES_H
 #define INES_H
 
+#include <stdint.h>
+
 typedef struct __attribute__((__packed__)) {
   char magic[4];
   unsigned char prgBlocks;
@@ -11,7 +13,7 @@ typedef struct __attribute__((__packed__)) {
 } InesHeader;
 
 // Returns false if header is invalid.
-int readInesHeader(const char* rom, InesHeader *header);
+int readInesHeader(const uint8_t* rom, InesHeader *header);
 
 int prgAddr(InesHeader header);
 int prgLen(InesHeader header);
