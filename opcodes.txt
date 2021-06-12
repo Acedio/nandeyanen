@@ -1,0 +1,271 @@
+BRK impl 
+ORA X_ind 
+--- 
+--- 
+--- 
+ORA zpg 
+ASL zpg 
+--- 
+PHP impl 
+ORA imm 
+ASL A 
+--- 
+--- 
+ORA abs 
+ASL abs 
+---
+
+BPL rel 
+ORA ind_Y 
+--- 
+--- 
+--- 
+ORA zpg_X 
+ASL zpg_X 
+--- 
+CLC impl 
+ORA abs_Y 
+--- 
+--- 
+--- 
+ORA abs_X 
+ASL abs_X 
+---
+
+JSR abs 
+AND X_ind 
+--- 
+--- 
+BIT zpg 
+AND zpg 
+ROL zpg 
+--- 
+PLP impl 
+AND imm 
+ROL A 
+--- 
+BIT abs 
+AND abs 
+ROL abs 
+---
+
+BMI rel 
+AND ind_Y 
+--- 
+--- 
+--- 
+AND zpg_X 
+ROL zpg_X 
+--- 
+SEC impl 
+AND abs_Y 
+--- 
+--- 
+--- 
+AND abs_X 
+ROL abs_X 
+---
+
+RTI impl 
+EOR X_ind 
+--- 
+--- 
+--- 
+EOR zpg 
+LSR zpg 
+--- 
+PHA impl 
+EOR imm 
+LSR A 
+--- 
+JMP abs 
+EOR abs 
+LSR abs 
+---
+
+BVC rel 
+EOR ind_Y 
+--- 
+--- 
+--- 
+EOR zpg_X 
+LSR zpg_X 
+--- 
+CLI impl 
+EOR abs_Y 
+--- 
+--- 
+--- 
+EOR abs_X 
+LSR abs_X 
+---
+
+RTS impl 
+ADC X_ind 
+--- 
+--- 
+--- 
+ADC zpg 
+ROR zpg 
+--- 
+PLA impl 
+ADC imm 
+ROR A 
+--- 
+JMP ind 
+ADC abs 
+ROR abs 
+---
+
+BVS rel 
+ADC ind_Y 
+--- 
+--- 
+--- 
+ADC zpg_X 
+ROR zpg_X 
+--- 
+SEI impl 
+ADC abs_Y 
+--- 
+--- 
+--- 
+ADC abs_X 
+ROR abs_X 
+---
+
+--- 
+STA X_ind 
+--- 
+--- 
+STY zpg 
+STA zpg 
+STX zpg 
+--- 
+DEY impl 
+--- 
+TXA impl 
+--- 
+STY abs 
+STA abs 
+STX abs 
+---
+
+BCC rel 
+STA ind_Y 
+--- 
+--- 
+STY zpg_X 
+STA zpg_X 
+STX zpg_Y 
+--- 
+TYA impl 
+STA abs_Y 
+TXS impl 
+--- 
+--- 
+STA abs_X 
+--- 
+---
+
+LDY imm 
+LDA X_ind 
+LDX imm 
+--- 
+LDY zpg 
+LDA zpg 
+LDX zpg 
+--- 
+TAY impl 
+LDA imm 
+TAX impl 
+--- 
+LDY abs 
+LDA abs 
+LDX abs 
+---
+
+BCS rel 
+LDA ind_Y 
+--- 
+--- 
+LDY zpg_X 
+LDA zpg_X 
+LDX zpg_Y 
+--- 
+CLV impl 
+LDA abs_Y 
+TSX impl 
+--- 
+LDY abs_X 
+LDA abs_X 
+LDX abs_Y 
+---
+
+CPY imm 
+CMP X_ind 
+--- 
+--- 
+CPY zpg 
+CMP zpg 
+DEC zpg 
+--- 
+INY impl 
+CMP imm 
+DEX impl 
+--- 
+CPY abs 
+CMP abs 
+DEC abs 
+---
+
+BNE rel 
+CMP ind_Y 
+--- 
+--- 
+--- 
+CMP zpg_X 
+DEC zpg_X 
+--- 
+CLD impl 
+CMP abs_Y 
+--- 
+--- 
+--- 
+CMP abs_X 
+DEC abs_X 
+---
+
+CPX imm 
+SBC X_ind 
+--- 
+--- 
+CPX zpg 
+SBC zpg 
+INC zpg 
+--- 
+INX impl 
+SBC imm 
+NOP impl 
+--- 
+CPX abs 
+SBC abs 
+INC abs 
+---
+
+BEQ rel 
+SBC ind_Y 
+--- 
+--- 
+--- 
+SBC zpg_X 
+INC zpg_X 
+--- 
+SED impl 
+SBC abs_Y 
+--- 
+--- 
+--- 
+SBC abs_X 
+INC abs_X 
+---
