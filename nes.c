@@ -2,6 +2,7 @@
 #include <malloc.h>
 #include <assert.h>
 
+#include "ines.h"
 #include "opcode.h"
 
 int printOp(const unsigned char *rom) {
@@ -111,17 +112,28 @@ int main(int argc, char **argv) {
   int romLen = readAll(argv[1], &rom);
   if (romLen < 0) {
     printf("Error reading ROM at %s\n", argv[1]);
-    if (rom) {
-      free(rom);
-    }
+    free(rom);
     return -1;
   } else {
     printf("Successfully opened ROM at %s (%d bytes).\n", argv[1], romLen);
   }
 
-  const char *cur = rom;
+  InesHeader header;
+  if (!readInesHeader(rom, &header)) {
+    printf("Error reading iNES header.\n");
+    free(rom);
+    return -1;
+  } else {
+    printf("Successfully read iNES header.\n");
+    printf("PRG blocks: %d\nCHR blocks: %d\n", header.prgLen, header.chrLen);
+    printf("flags6: %X\nflags7: %X\n", header.flags6, header.flags7);
+  }
+
+  char *prgRom = rom + prgAddr(header);
+
+  const char *cur = prgRom;
   while (1) {
-    printf("; @0x%04X\n", cur - rom);
+    printf("; @0x%04X\n", cur - prgRom);
     if (feof(stdin)) {
       break;
     }
@@ -146,7 +158,7 @@ int main(int argc, char **argv) {
           printf("bad param\n");
           break;
         }
-        cur = rom + param;
+        cur = prgRom + param;
         break;
       default:
         printf("error: unknown command '%c'\n", cmd);

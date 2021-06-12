@@ -1,6 +1,6 @@
 all: nes
 
-nes: nes.o opcode.o
+nes: nes.o opcode.o ines.o
 	gcc -g $^ -o $@
 
 nes.o: nes.c
@@ -8,6 +8,9 @@ nes.o: nes.c
 
 %.o: %.c %.h
 	gcc -c $<
+
+test: nes
+	./nes nestest.nes
 
 clean:
 	rm nes
