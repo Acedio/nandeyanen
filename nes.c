@@ -1,14 +1,8 @@
 #include <stdio.h>
+#include <malloc.h>
 #include <assert.h>
 
 #include "opcode.h"
-
-const unsigned char ROM[] = {
-  0x45, 0xFF,
-  0x6C, 0x12, 0x34,
-  0x00,
-};
-const int ROM_LEN = sizeof ROM;
 
 int printOp(const unsigned char *rom) {
   assert(rom);
@@ -21,10 +15,10 @@ int printOp(const unsigned char *rom) {
   int len = opLen(addrMode);
   switch (len) {
     case 1:
-      printf("%02X __ __ | ", b1);
+      printf("%02X -- -- | ", b1);
       break;
     case 2:
-      printf("%02X %02X __ | ", b1, rom[1]);
+      printf("%02X %02X -- | ", b1, rom[1]);
       break;
     case 3:
       printf("%02X %02X %02X | ", b1, rom[1], rom[2]);
@@ -74,10 +68,60 @@ int getInt(int *out) {
   return 1;
 }
 
+int readAll(const char* filename, char **buffer) {
+  if (filename == NULL || buffer == NULL) {
+    return -1;
+  }
+
+  FILE *f = fopen(filename, "r");
+  if (f == NULL) {
+    return -1;
+  }
+
+  fseek(f, 0, SEEK_END);
+  int len = ftell(f);
+
+  *buffer = calloc(len, sizeof(char));
+  if (*buffer == NULL) {
+    fclose(f);
+    return -1;
+  }
+
+  fseek(f, 0, SEEK_SET);
+  int read = fread(*buffer, sizeof(char), len, f);
+  if (read != len) {
+    printf("read != length: %d != %d\n", read, len);
+    fclose(f);
+    return -1;
+  }
+
+  fclose(f);
+
+  return len;
+}
+
 int main(int argc, char **argv) {
-  const unsigned char *cur = ROM;
+  if (argc != 2) {
+    printf("Usage\n");
+    printf("%s [path]\n", argv[0]);
+    return -1;
+  }
+
+  char *rom = NULL;
+  int romLen = readAll(argv[1], &rom);
+  if (romLen < 0) {
+    printf("Error reading ROM at %s\n", argv[1]);
+    if (rom) {
+      free(rom);
+    }
+    return -1;
+  } else {
+    printf("Successfully opened ROM at %s (%d bytes).\n", argv[1], romLen);
+  }
+
+  const char *cur = rom;
   while (1) {
-    printf("; @0x%04X\n", cur - ROM);
+    printf("; @0x%04X\n", cur - rom);
     if (feof(stdin)) {
       break;
     }
@@ -102,13 +146,14 @@ int main(int argc, char **argv) {
           printf("bad param\n");
           break;
         }
-        cur = ROM + param;
+        cur = rom + param;
         break;
       default:
         printf("error: unknown command '%c'\n", cmd);
         break;
     }
   }
+  free(rom);
   printf("Goodbye!\n");
   return 0;
 }

@@ -1,7 +1,7 @@
 all: nes
 
 nes: nes.o opcode.o
-	gcc $^ -o $@
+	gcc -g $^ -o $@
 
 nes.o: nes.c
 	gcc -c $^
