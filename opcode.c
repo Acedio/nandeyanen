@@ -340,7 +340,7 @@ const char *addrModeName(int addrMode) {
   }
 }
 
-int opLen(int addrMode) {
+uint16_t opLen(int addrMode) {
   switch (addrMode) {
     case A_ABS: return 3;
     case A_ABS_X: return 3;

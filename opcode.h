@@ -1,6 +1,8 @@
 #ifndef OPCODE_H
 #define OPCODE_H
 
+#include <stdint.h>
+
 enum Op {
 	UND = 0, ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC,
 	CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY, EOR, INC, INX, INY, JMP, JSR,
@@ -36,6 +38,6 @@ const char *opName(int op);
 const char *addrModeName(int addrMode);
 
 // -1 on invalid.
-int opLen(int addrMode);
+uint16_t opLen(int addrMode);
 
 #endif  // OPCODE_H

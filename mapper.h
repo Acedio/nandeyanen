@@ -18,4 +18,7 @@ uint8_t readByte(Memory *memory, const PrgRom *prgRom, uint16_t addr);
 // Read's a little-endian word from memory.
 uint16_t readWord(Memory *memory, const PrgRom *prgRom, uint16_t addr);
 
+void writeByte(Memory *memory, const PrgRom *prgRom, uint16_t addr,
+               uint8_t byte);
+
 #endif  // MAPPER_H

@@ -3,12 +3,16 @@
 
 #include <stdint.h>
 
-// Returns bytes read.
-int printOp(const uint8_t *rom);
+#include "cpu.h"
 
 // Returns bytes read.
-int printOps(const uint8_t *rom, const uint8_t *romEnd, int numOps);
+uint16_t printOp(const PrgRom *rom, uint16_t pc);
 
-void examineRom(const uint8_t *rom, int romLen);
+// Returns bytes read.
+uint16_t printOps(const PrgRom *rom, uint16_t pc, int numOps);
+
+uint16_t printState(const CpuState *cpu, const PrgRom *rom, uint16_t pc);
+
+void examineRom(const PrgRom *rom, uint16_t pc);
 
 #endif  // EXAMINE_H

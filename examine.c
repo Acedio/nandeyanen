@@ -5,50 +5,68 @@
 #include <stdint.h>
 
 #include "opcode.h"
+#include "memory.h"
+#include "mapper.h"
 
-// TODO: Can overflow.
-int printOp(const uint8_t *rom) {
+uint16_t printOp(const PrgRom* rom, uint16_t pc) {
   assert(rom);
 
-  uint8_t b1 = *rom;
+  uint8_t b1 = readByte(NULL, rom, pc);
 
   int op = opcodes[b1].op;
   int addrMode = opcodes[b1].addrMode;
 
-  int len = opLen(addrMode);
+  uint16_t len = opLen(addrMode);
   switch (len) {
     case 1:
-      printf("%02X -- -- | ", b1);
+      printf("%02X        ", b1);
       break;
     case 2:
-      printf("%02X %02X -- | ", b1, rom[1]);
+      printf("%02X %02X     ", b1, readByte(NULL, rom, pc+1));
       break;
     case 3:
-      printf("%02X %02X %02X | ", b1, rom[1], rom[2]);
+      printf("%02X %02X %02X  ", b1, readByte(NULL, rom, pc+1),
+             readByte(NULL, rom, pc+2));
       break;
     default:
       printf("bad op: %02X\n", b1);
       return -1;
   }
 
-  printf("%s %s\n", opName(op), addrModeName(addrMode));
+  // TODO: Print args
+
+  printf("%s %s", opName(op), addrModeName(addrMode));
 
   return len;
 }
 
 // Returns bytes read.
-int printOps(const uint8_t *rom, const uint8_t *romEnd, int numOps) {
-  const uint8_t *start = rom;
-  for (; rom < romEnd && numOps > 0; --numOps) {
-    int b = printOp(rom);
+uint16_t printOps(const PrgRom* rom, uint16_t pc, int numOps) {
+  uint16_t start = pc;
+  for (; numOps > 0; --numOps) {
+    int b = printOp(rom, pc);
+    printf("\n");
     if (b < 1) {
       // Skip to the next op if this one was invalid.
-      rom += 1;
+      pc += 1;
     } else {
-      rom += b;
+      pc += b;
     }
   }
-  return rom - start;
+  return pc - start;
+}
+
+void printCpuState(const CpuState *cpu) {
+  printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X", cpu->a, cpu->x, cpu->y,
+         cpu->status, cpu->s);
+}
+
+uint16_t printState(const CpuState *cpu, const PrgRom *rom, uint16_t pc) {
+  printf("%04X  ", cpu->pc);
+  printOp(rom, pc);
+  printf("    ");
+  printCpuState(cpu);
+  printf("\n");
 }
 
 int isWhitespace(char c) {
@@ -78,18 +96,16 @@ int getHex(int *out) {
   }
   return 1;
 }
-void examineRom(const uint8_t *rom, int romLen) {
-  const uint8_t *cur = rom;
+
+void examineRom(const PrgRom *rom, uint16_t pc) {
   while (1) {
-    printf("; @0x%04X\n", cur - rom);
+    printf("%04X  ", pc);
+    printOp(rom, pc);
+    printf("\n");
     if (feof(stdin)) {
       break;
     }
-    if (cur >= rom + romLen) {
-      printf("ROM ended at %x.\n", romLen);
-      break;
-    }
-    int bytesRead = printOps(cur, rom + romLen, 10);
+    uint16_t bytesRead = printOps(rom, pc, 10);
     char cmd = getCommand();
     if (cmd == 'q') {
       break;
@@ -97,20 +113,20 @@ void examineRom(const uint8_t *rom, int romLen) {
     int param;
     switch (cmd) {
       case 'n':
-        cur += bytesRead;
+        pc += bytesRead;
         break;
       case 'i':
-        cur += 1;
+        pc += 1;
         break;
       case 'd':
-        cur -= 1;
+        pc -= 1;
         break;
       case 'a':
         if (!getHex(&param) || param < 0) {
           printf("bad param\n");
           break;
         }
-        cur = rom + param;
+        pc = param;
         break;
       default:
         printf("error: unknown command '%c'\n", cmd);

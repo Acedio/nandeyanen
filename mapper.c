@@ -28,3 +28,9 @@ uint16_t readWord(Memory *memory, const PrgRom *prgRom, uint16_t addr) {
   word += readByte(memory, prgRom, addr);
   return word;
 }
+
+void writeByte(Memory *memory, const PrgRom *prgRom, uint16_t addr,
+               uint8_t byte) {
+  assert(addr < 0x0800);
+  memory->memory[addr] = byte;
+}

@@ -6,6 +6,7 @@
 
 #include "opcode.h"
 #include "mapper.h"
+#include "examine.h"
 
 void initCpu(CpuState *cpu) {
   assert(cpu);
@@ -32,6 +33,18 @@ uint8_t cpuReadByte(CpuState *cpu, const PrgRom *prgRom, Operation op,
     default:
       printf("unsupported addressing mode %s\n", addrModeName(op.addrMode));
       return 0x55;
+  }
+}
+
+void cpuWriteByte(CpuState *cpu, const PrgRom *prgRom, Operation op,
+                  uint16_t pc, uint8_t byte) {
+  switch (op.addrMode) {
+    case A_ZPG:
+      uint16_t addr = readByte(&cpu->memory, prgRom, pc+1);
+      writeByte(&cpu->memory, prgRom, addr, byte);
+      break;
+    default:
+      printf("unsupported addressing mode %s\n", addrModeName(op.addrMode));
   }
 }
 
@@ -62,19 +75,26 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
     return 0;
   }
 
+  printState(cpu, prgRom, cpu->pc);
+
+  uint16_t nextPc = cpu->pc + opLen(op.addrMode);
+
   switch (op.op) {
     case JMP:
-      cpu->pc = readAddr(&cpu->memory, prgRom, op, cpu->pc + 1);
-      printf("pc set to %x\n", cpu->pc);
+      nextPc = readAddr(&cpu->memory, prgRom, op, cpu->pc + 1);
       break;
     case LDX:
       cpu->x = cpuReadByte(cpu, prgRom, op, cpu->pc);
-      cpu->pc += opLen(op.addrMode);
+      break;
+    case STX:
+      cpuWriteByte(cpu, prgRom, op, cpu->pc, cpu->x);
       break;
     default:
       printf("unsupported op %s\n", opName(op.op));
       return 0;
   }
+
+  cpu->pc = nextPc;
 
   return 1;
 }
