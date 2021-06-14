@@ -6,6 +6,7 @@
 #include "cpu.h"
 #include "examine.h"
 #include "ines.h"
+#include "mapper.h"
 #include "opcode.h"
 
 int readAll(const char* filename, uint8_t **buffer) {
@@ -69,7 +70,7 @@ int main(int argc, char **argv) {
     printf("flags6: %X\nflags7: %X\n", header.flags6, header.flags7);
   }
 
-  uint8_t *prgRom = rom + prgAddr(header);
+  PrgRom *prgRom = makePrgRom(rom + prgAddr(header), prgLen(header));
 
   CpuState cpu;
   initCpu(&cpu);
@@ -78,7 +79,7 @@ int main(int argc, char **argv) {
 
   int success = 1;
   while (success) {
-    success = step(&cpu, prgRom, prgLen(header));
+    success = step(&cpu, prgRom);
   }
 
   free(rom);

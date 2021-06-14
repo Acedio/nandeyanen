@@ -18,43 +18,40 @@ void initCpu(CpuState *cpu) {
   cpu->status = 0x34;
 
   for (int i = 0; i < sizeof(cpu->memory); ++i) {
-    cpu->memory[i] = 0xff;
+    cpu->memory.memory[i] = 0xff;
   }
 }
 
-// TODO: This depends on mapper.
-int pcToAddr(int pc) {
-  return (pc - 0x8000) % 0x4000;
+uint16_t readAddr(Memory *memory, const PrgRom *prgRom, Operation op,
+                  uint16_t at) {
+  uint16_t addr = 0xF00D;
+  switch (op.addrMode) {
+    case A_ABS:
+      return readWord(memory, prgRom, at);
+    case A_IND:
+      at = readWord(memory, prgRom, at);
+      return readWord(memory, prgRom, at);
+    default:
+      printf("unsupported addressing mode %s\n", addrModeName(op.addrMode));
+      return 0xF00D;
+  }
 }
 
-int step(CpuState *cpu, const uint8_t *prgRom, int prgLen) {
+int step(CpuState *cpu, const PrgRom *prgRom) {
   assert(cpu);
   assert(prgRom);
 
-  int prgAddr = pcToAddr(cpu->pc);
-  assert(prgAddr < prgLen && prgAddr >= 0);
-  uint8_t b1 = *(prgRom + prgAddr);
+  uint8_t b1 = readMem(&cpu->memory, prgRom, cpu->pc);
   Operation op = opcodes[b1];
 
   if (op.op == UND) {
     printf("invalid operation %x\n", b1);
     return 0;
   }
-  uint16_t addr = 0xF00D;
-  switch (op.addrMode) {
-    case A_ABS:
-      addr = prgRom[prgAddr + 2];
-      addr <<= 8;
-      addr += prgRom[prgAddr + 1];
-      break;
-    default:
-      printf("unsupported addressing mode %s\n", addrModeName(op.addrMode));
-      return 0;
-  }
 
   switch (op.op) {
     case JMP:
-      cpu->pc = addr;
+      cpu->pc = readAddr(&cpu->memory, prgRom, op, cpu->pc + 1);
       printf("pc set to %x\n", cpu->pc);
       break;
     default:
