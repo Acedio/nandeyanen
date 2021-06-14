@@ -5,6 +5,7 @@
 
 #include "memory.h"
 #include "mapper.h"
+#include "opcode.h"
 
 enum StatusFlags {
   F_CARRY = 0x01,
@@ -31,5 +32,10 @@ typedef struct {
 void initCpu(CpuState *cpu);
 
 int step(CpuState *cpu, const PrgRom *prgRom);
+
+uint8_t getByteOp(CpuState *cpu, const PrgRom *prgRom, Operation op,
+                   uint16_t pc);
+uint16_t getAddrOp(const Memory *memory, const PrgRom *prgRom, Operation op,
+                   uint16_t pc);
 
 #endif  // CPU_H

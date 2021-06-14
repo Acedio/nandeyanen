@@ -17,12 +17,17 @@ PrgRom *makePrgRom(const uint8_t *prgBytes, int romLen) {
   return prgRom;
 }
 
-uint8_t readByte(Memory *memory, const PrgRom *prgRom, uint16_t addr) {
-  assert(addr >= 0x8000);
-  return prgRom->rom[(addr - 0x8000) % PRG_SIZE];
+uint8_t readByte(const Memory *memory, const PrgRom *prgRom, uint16_t addr) {
+  assert(addr < 0x0800 || addr >= 0x8000);
+  if (addr < 0x0800) {
+    return memory->memory[addr];
+  } else if (addr >= 0x8000) {
+    return prgRom->rom[(addr - 0x8000) % PRG_SIZE];
+  }
+  return 0x55;
 }
 
-uint16_t readWord(Memory *memory, const PrgRom *prgRom, uint16_t addr) {
+uint16_t readWord(const Memory *memory, const PrgRom *prgRom, uint16_t addr) {
   uint16_t word = readByte(memory, prgRom, addr+1);
   word <<= 8;
   word += readByte(memory, prgRom, addr);

@@ -21,12 +21,12 @@ void initCpu(CpuState *cpu) {
   cpu->status = 0x24;
 
   for (int i = 0; i < sizeof(cpu->memory); ++i) {
-    cpu->memory.memory[i] = 0xff;
+    cpu->memory.memory[i] = 0x00;
   }
 }
 
-uint8_t cpuReadByte(CpuState *cpu, const PrgRom *prgRom, Operation op,
-                    uint16_t pc) {
+uint8_t getByteOp(CpuState *cpu, const PrgRom *prgRom, Operation op,
+                  uint16_t pc) {
   switch (op.addrMode) {
     case A_IMM:
       return readByte(&cpu->memory, prgRom, pc+1);
@@ -50,7 +50,7 @@ void cpuWriteByte(CpuState *cpu, const PrgRom *prgRom, Operation op,
   }
 }
 
-uint16_t getAddrOp(Memory *memory, const PrgRom *prgRom, Operation op,
+uint16_t getAddrOp(const Memory *memory, const PrgRom *prgRom, Operation op,
                    uint16_t pc) {
   uint16_t addr = 0xF00D;
   switch (op.addrMode) {
@@ -150,21 +150,21 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
 
     case LDA:
-      cpu->a = cpuReadByte(cpu, prgRom, op, cpu->pc);
+      cpu->a = getByteOp(cpu, prgRom, op, cpu->pc);
       cpuSetNZ(cpu, cpu->a);
       break;
     case STA:
       cpuWriteByte(cpu, prgRom, op, cpu->pc, cpu->a);
       break;
     case LDX:
-      cpu->x = cpuReadByte(cpu, prgRom, op, cpu->pc);
+      cpu->x = getByteOp(cpu, prgRom, op, cpu->pc);
       cpuSetNZ(cpu, cpu->x);
       break;
     case STX:
       cpuWriteByte(cpu, prgRom, op, cpu->pc, cpu->x);
       break;
     case LDY:
-      cpu->y = cpuReadByte(cpu, prgRom, op, cpu->pc);
+      cpu->y = getByteOp(cpu, prgRom, op, cpu->pc);
       cpuSetNZ(cpu, cpu->y);
       break;
     case STY:
@@ -172,7 +172,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
 
     case BIT:
-      uint8_t operand = cpuReadByte(cpu, prgRom, op, cpu->pc);
+      uint8_t operand = getByteOp(cpu, prgRom, op, cpu->pc);
       uint8_t z = operand & cpu->a ? 0 : F_ZERO;
       // Copy N and V to status flags.
       cpu->status = (operand & (F_OVERFLOW | F_NEGATIVE)) | z |

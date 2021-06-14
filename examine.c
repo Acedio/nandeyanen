@@ -8,12 +8,14 @@
 #include "memory.h"
 #include "mapper.h"
 
-uint16_t printOp(const PrgRom* rom, uint16_t pc) {
+uint16_t printOp(const CpuState* cpu, const PrgRom* rom, uint16_t pc) {
   assert(rom);
 
-  uint8_t b1 = readByte(NULL, rom, pc);
+  uint8_t b1 = readByte(&cpu->memory, rom, pc);
+  uint8_t b2 = readByte(&cpu->memory, rom, pc+1);
+  uint8_t b3 = readByte(&cpu->memory, rom, pc+2);
 
-  int op = opcodes[b1].op;
+  Operation op = opcodes[b1];
   int addrMode = opcodes[b1].addrMode;
 
   uint16_t len = opLen(addrMode);
@@ -22,29 +24,81 @@ uint16_t printOp(const PrgRom* rom, uint16_t pc) {
       printf("%02X        ", b1);
       break;
     case 2:
-      printf("%02X %02X     ", b1, readByte(NULL, rom, pc+1));
+      printf("%02X %02X     ", b1, b2);
       break;
     case 3:
-      printf("%02X %02X %02X  ", b1, readByte(NULL, rom, pc+1),
-             readByte(NULL, rom, pc+2));
+      printf("%02X %02X %02X  ", b1, b2, b3);
       break;
     default:
       printf("bad op: %02X\n", b1);
       return -1;
   }
 
-  // TODO: Print args
+  printf("%s ", opName(op.op));
 
-  printf("%s %s", opName(op), addrModeName(addrMode));
+  uint16_t addr = 0xF00D;
+  switch (addrMode) {
+    case A_ABS:
+      addr = getAddrOp(&cpu->memory, rom, op, pc);
+      if (op.op == JMP || op.op == JSR) {
+        printf("$%04X      ", addr);
+      } else {
+        printf("$%04X = %02X", addr, readByte(&cpu->memory, rom, addr));
+      }
+      break;
+    case A_ABS_X:
+      addr = getAddrOp(&cpu->memory, rom, op, pc);
+      printf("$%04X,X @ %04X = %02X", addr, cpu->x + addr,
+            readByte(&cpu->memory, rom, addr));
+      break;
+    case A_ABS_Y:
+      addr = getAddrOp(&cpu->memory, rom, op, pc);
+      printf("$%04X,Y @ %04X = %02X", addr, cpu->y + addr,
+            readByte(&cpu->memory, rom, addr));
+      break;
+    case A_ACC:
+      printf("A          ");
+      break;
+    case A_IMM:
+      printf("#$%02X       ", b2);
+      break;
+    case A_IMPL:
+      printf("           ");
+      break;
+    case A_IND:
+      printf("($%02X%02X) ", b3, b2);
+      break;
+    case A_IND_Y:
+      printf("($%02X),Y", b2);
+      break;
+    case A_REL:
+      printf("$%04X      ", pc + 2 + (int8_t)b2);
+      break;
+    case A_X_IND:
+      printf("($%02X,X)", b2);
+      break;
+    case A_ZPG:
+      printf("$%02X = %02X   ", b2, readByte(&cpu->memory, rom, b2));
+      break;
+    case A_ZPG_X:
+      printf("$%02X,X  ", b2);
+      break;
+    case A_ZPG_Y:
+      printf("$%02X,Y  ", b2);
+      break;
+    default:
+      printf("Unsupported address mode!\n");
+  }
+  printf("             ");
 
   return len;
 }
 
 // Returns bytes read.
-uint16_t printOps(const PrgRom* rom, uint16_t pc, int numOps) {
+uint16_t printOps(const CpuState *cpu, const PrgRom* rom, uint16_t pc, int numOps) {
   uint16_t start = pc;
   for (; numOps > 0; --numOps) {
-    int b = printOp(rom, pc);
+    int b = printOp(cpu, rom, pc);
     printf("\n");
     if (b < 1) {
       // Skip to the next op if this one was invalid.
@@ -63,7 +117,7 @@ void printCpuState(const CpuState *cpu) {
 
 uint16_t printState(const CpuState *cpu, const PrgRom *rom, uint16_t pc) {
   printf("%04X  ", cpu->pc);
-  printOp(rom, pc);
+  printOp(cpu, rom, pc);
   printf("    ");
   printCpuState(cpu);
   printf("\n");
@@ -97,15 +151,13 @@ int getHex(int *out) {
   return 1;
 }
 
-void examineRom(const PrgRom *rom, uint16_t pc) {
+void examineRom(const CpuState *cpu, const PrgRom *rom, uint16_t pc) {
   while (1) {
-    printf("%04X  ", pc);
-    printOp(rom, pc);
-    printf("\n");
+    printf("; %04X\n", pc);
     if (feof(stdin)) {
       break;
     }
-    uint16_t bytesRead = printOps(rom, pc, 10);
+    uint16_t bytesRead = printOps(cpu, rom, pc, 10);
     char cmd = getCommand();
     if (cmd == 'q') {
       break;
