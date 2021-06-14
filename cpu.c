@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "opcode.h"
+#include "mapper.h"
 
 void initCpu(CpuState *cpu) {
   assert(cpu);
@@ -19,6 +20,18 @@ void initCpu(CpuState *cpu) {
 
   for (int i = 0; i < sizeof(cpu->memory); ++i) {
     cpu->memory.memory[i] = 0xff;
+  }
+}
+
+uint8_t cpuReadByte(CpuState *cpu, const PrgRom *prgRom, Operation op,
+                 uint16_t pc) {
+  uint8_t addr = 0x55;
+  switch (op.addrMode) {
+    case A_IMM:
+      return readByte(&cpu->memory, prgRom, pc+1);
+    default:
+      printf("unsupported addressing mode %s\n", addrModeName(op.addrMode));
+      return 0x55;
   }
 }
 
@@ -41,7 +54,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
   assert(cpu);
   assert(prgRom);
 
-  uint8_t b1 = readMem(&cpu->memory, prgRom, cpu->pc);
+  uint8_t b1 = readByte(&cpu->memory, prgRom, cpu->pc);
   Operation op = opcodes[b1];
 
   if (op.op == UND) {
@@ -53,6 +66,10 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
     case JMP:
       cpu->pc = readAddr(&cpu->memory, prgRom, op, cpu->pc + 1);
       printf("pc set to %x\n", cpu->pc);
+      break;
+    case LDX:
+      cpu->x = cpuReadByte(cpu, prgRom, op, cpu->pc);
+      cpu->pc += opLen(op.addrMode);
       break;
     default:
       printf("unsupported op %s\n", opName(op.op));
