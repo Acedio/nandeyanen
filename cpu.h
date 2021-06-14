@@ -6,6 +6,17 @@
 #include "memory.h"
 #include "mapper.h"
 
+enum StatusFlags {
+  F_CARRY = 0x01,
+  F_ZERO = 0x02,
+  F_INTDIS = 0x04,
+  F_DECIMAL = 0x08,
+  // Unused = 0x10,
+  // Unused = 0x20,
+  F_OVERFLOW = 0x40,
+  F_NEGATIVE = 0x80,
+};
+
 typedef struct {
   uint8_t a;
   uint8_t x;

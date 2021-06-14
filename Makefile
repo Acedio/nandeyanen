@@ -13,5 +13,5 @@ test: nes
 	./nes nestest.nes
 
 clean:
-	rm nes
-	rm *.o
+	-rm nes
+	-rm *.o
