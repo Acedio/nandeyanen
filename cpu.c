@@ -72,6 +72,23 @@ void cpuStackPush(CpuState *cpu, uint8_t byte) {
   cpu->s -= 1;
 }
 
+void cpuStackPushWord(CpuState *cpu, uint16_t word) {
+  cpuStackPush(cpu, word & 0xff);
+  cpuStackPush(cpu, word >> 8);
+}
+
+uint8_t cpuStackPop(CpuState *cpu) {
+  cpu->s += 1;
+  return cpu->memory.memory[0x100 + cpu->s];
+}
+
+uint16_t cpuStackPopWord(CpuState *cpu) {
+  uint16_t word = cpuStackPop(cpu);
+  word <<= 8;
+  word |= cpuStackPop(cpu);
+  return word;
+}
+
 void cpuSetNZ(CpuState *cpu, uint8_t result) {
   uint8_t n = result & 0x80 ? F_NEGATIVE : 0;
   uint8_t z = result ? 0 : F_ZERO;
@@ -94,6 +111,8 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
 
   uint16_t nextPc = cpu->pc + opLen(op.addrMode);
 
+  uint8_t byteOp;
+
   switch (op.op) {
     case NOP:
       break;
@@ -103,9 +122,11 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
     case JSR:
       // TODO: nextPc might not be correct, seems like it might be nextPc-1.
-      cpuStackPush(cpu, nextPc & 0xff);
-      cpuStackPush(cpu, nextPc >> 8);
+      cpuStackPushWord(cpu, nextPc);
       nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+      break;
+    case RTS:
+      nextPc = cpuStackPopWord(cpu);
       break;
 
     case BCC:
@@ -171,12 +192,43 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       cpuWriteByte(cpu, prgRom, op, cpu->pc, cpu->y);
       break;
 
+    case PHA:
+      cpuStackPush(cpu, cpu->a);
+      break;
+    case PHP:
+      // Bit 5 and 4 are set to 1.
+      cpuStackPush(cpu, cpu->status | 0x30);
+      break;
+    case PLA:
+      cpu->a = cpuStackPop(cpu);
+      cpuSetNZ(cpu, cpu->a);
+      break;
+    case PLP:
+      // Don't change bit 5 and 4.
+      cpu->status = (cpu->status & 0x30) | (cpuStackPop(cpu) & ~0x30);
+      break;
+
     case BIT:
-      uint8_t operand = getByteOp(cpu, prgRom, op, cpu->pc);
-      uint8_t z = operand & cpu->a ? 0 : F_ZERO;
+      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      uint8_t z = byteOp & cpu->a ? 0 : F_ZERO;
       // Copy N and V to status flags.
-      cpu->status = (operand & (F_OVERFLOW | F_NEGATIVE)) | z |
+      cpu->status = (byteOp & (F_OVERFLOW | F_NEGATIVE)) | z |
                     (cpu->status & ~(F_OVERFLOW | F_NEGATIVE | F_ZERO));
+      break;
+    case CMP:
+      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      cpuSetNZ(cpu, cpu->a - byteOp);
+      cpu->status = (cpu->status & ~F_CARRY) | (cpu->a >= byteOp ? F_CARRY : 0);
+      break;
+    case CPX:
+      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      cpuSetNZ(cpu, cpu->x - byteOp);
+      cpu->status = (cpu->status & ~F_CARRY) | (cpu->x >= byteOp ? F_CARRY : 0);
+      break;
+    case CPY:
+      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      cpuSetNZ(cpu, cpu->y - byteOp);
+      cpu->status = (cpu->status & ~F_CARRY) | (cpu->y >= byteOp ? F_CARRY : 0);
       break;
 
     case SEC:
@@ -199,6 +251,31 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
     case CLV:
       cpu->status &= ~F_OVERFLOW;
+      break;
+
+    case AND:
+      cpu->a &= getByteOp(cpu, prgRom, op, cpu->pc);
+      cpuSetNZ(cpu, cpu->a);
+      break;
+    case ORA:
+      cpu->a |= getByteOp(cpu, prgRom, op, cpu->pc);
+      cpuSetNZ(cpu, cpu->a);
+      break;
+    case EOR:
+      cpu->a ^= getByteOp(cpu, prgRom, op, cpu->pc);
+      cpuSetNZ(cpu, cpu->a);
+      break;
+    case ADC:
+      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      uint8_t result = cpu->a + byteOp + (cpu->status & F_CARRY ? 1 : 0);
+      // Set overflow if the operands' MSBs are equal and the result's MSB is
+      // not the same. Can this be simplified?
+      cpu->status = (cpu->status & ~F_OVERFLOW) |
+          (!((cpu->a ^ byteOp) & 0x80) &&
+           ((result ^ byteOp) & 0x80) ? F_OVERFLOW : 0);
+      cpu->a = result;
+      cpuSetNZ(cpu, cpu->a);
+      cpu->status = (cpu->status & ~F_CARRY) | (cpu->a < byteOp ? F_CARRY : 0);
       break;
 
     default:
