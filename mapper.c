@@ -7,7 +7,7 @@
 
 PrgRom *makePrgRom(const uint8_t *prgBytes, int romLen) {
   if (romLen != PRG_SIZE) {
-    printf("incorrect romLen: %d\n", romLen);
+    fprintf(stderr, "incorrect romLen: %d\n", romLen);
     return NULL;
   }
 
@@ -34,8 +34,7 @@ uint16_t readWord(const Memory *memory, const PrgRom *prgRom, uint16_t addr) {
   return word;
 }
 
-void writeByte(Memory *memory, const PrgRom *prgRom, uint16_t addr,
-               uint8_t byte) {
+void writeByte(Memory *memory, uint16_t addr, uint8_t byte) {
   assert(addr < 0x0800);
   memory->memory[addr] = byte;
 }

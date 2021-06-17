@@ -18,7 +18,7 @@ int readInesHeader(const uint8_t* rom, InesHeader *header) {
   }
 
   if (header->flags7 & 0x0C == 0x0C) {
-    printf("Implement iNES 2.0!\n");
+    fprintf(stderr, "Implement iNES 2.0!\n");
     return 0;
   }
 

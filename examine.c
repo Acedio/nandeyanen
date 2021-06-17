@@ -43,7 +43,7 @@ uint16_t printOp(const CpuState* cpu, const PrgRom* rom, uint16_t pc) {
       if (op.op == JMP || op.op == JSR) {
         printf("$%04X      ", addr);
       } else {
-        printf("$%04X = %02X", addr, readByte(&cpu->memory, rom, addr));
+        printf("$%04X = %02X ", addr, readByte(&cpu->memory, rom, addr));
       }
       break;
     case A_ABS_X:

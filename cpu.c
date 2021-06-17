@@ -25,35 +25,12 @@ void initCpu(CpuState *cpu) {
   }
 }
 
-uint8_t getByteOp(CpuState *cpu, const PrgRom *prgRom, Operation op,
-                  uint16_t pc) {
-  switch (op.addrMode) {
-    case A_IMM:
-      return readByte(&cpu->memory, prgRom, pc+1);
-    case A_ZPG:
-      return cpu->memory.memory[readByte(&cpu->memory, prgRom, pc+1)];
-    default:
-      printf("unsupported addressing mode %s\n", addrModeName(op.addrMode));
-      return 0x55;
-  }
-}
-
-void cpuWriteByte(CpuState *cpu, const PrgRom *prgRom, Operation op,
-                  uint16_t pc, uint8_t byte) {
-  switch (op.addrMode) {
-    case A_ZPG:
-      uint16_t addr = readByte(&cpu->memory, prgRom, pc+1);
-      writeByte(&cpu->memory, prgRom, addr, byte);
-      break;
-    default:
-      printf("unsupported addressing mode %s\n", addrModeName(op.addrMode));
-  }
-}
-
 uint16_t getAddrOp(const Memory *memory, const PrgRom *prgRom, Operation op,
                    uint16_t pc) {
   uint16_t addr = 0xF00D;
   switch (op.addrMode) {
+    case A_IMM:
+      return pc+1;
     case A_ABS:
       return readWord(memory, prgRom, pc+1);
     case A_IND:
@@ -61,10 +38,19 @@ uint16_t getAddrOp(const Memory *memory, const PrgRom *prgRom, Operation op,
       return readWord(memory, prgRom, pc);
     case A_REL:
       return pc + 2 + (int8_t)readByte(memory, prgRom, pc+1);
+    case A_ZPG:
+      return readByte(memory, prgRom, pc+1);
     default:
-      printf("unsupported addressing mode %s\n", addrModeName(op.addrMode));
+      fprintf(stderr, "unsupported addressing mode %s for getAddrOp\n",
+              addrModeName(op.addrMode));
       return 0xF00D;
   }
+}
+
+uint8_t getByteOp(CpuState *cpu, const PrgRom *prgRom, Operation op,
+                  uint16_t pc) {
+  uint16_t addr = getAddrOp(&cpu->memory, prgRom, op, pc);
+  return readByte(&cpu->memory, prgRom, addr);
 }
 
 void cpuStackPush(CpuState *cpu, uint8_t byte) {
@@ -73,8 +59,8 @@ void cpuStackPush(CpuState *cpu, uint8_t byte) {
 }
 
 void cpuStackPushWord(CpuState *cpu, uint16_t word) {
-  cpuStackPush(cpu, word & 0xff);
   cpuStackPush(cpu, word >> 8);
+  cpuStackPush(cpu, word & 0xff);
 }
 
 uint8_t cpuStackPop(CpuState *cpu) {
@@ -84,8 +70,7 @@ uint8_t cpuStackPop(CpuState *cpu) {
 
 uint16_t cpuStackPopWord(CpuState *cpu) {
   uint16_t word = cpuStackPop(cpu);
-  word <<= 8;
-  word |= cpuStackPop(cpu);
+  word |= cpuStackPop(cpu) << 8;
   return word;
 }
 
@@ -103,7 +88,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
   Operation op = opcodes[b1];
 
   if (op.op == UND) {
-    printf("invalid operation %x\n", b1);
+    fprintf(stderr, "invalid operation %x\n", b1);
     return 0;
   }
 
@@ -111,7 +96,10 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
 
   uint16_t nextPc = cpu->pc + opLen(op.addrMode);
 
+  // A few intermediary variables to use below.
+  uint16_t addr;
   uint8_t byteOp;
+  uint8_t result;
 
   switch (op.op) {
     case NOP:
@@ -121,12 +109,11 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
       break;
     case JSR:
-      // TODO: nextPc might not be correct, seems like it might be nextPc-1.
-      cpuStackPushWord(cpu, nextPc);
+      cpuStackPushWord(cpu, nextPc - 1);
       nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
       break;
     case RTS:
-      nextPc = cpuStackPopWord(cpu);
+      nextPc = cpuStackPopWord(cpu) + 1;
       break;
 
     case BCC:
@@ -175,21 +162,24 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       cpuSetNZ(cpu, cpu->a);
       break;
     case STA:
-      cpuWriteByte(cpu, prgRom, op, cpu->pc, cpu->a);
+      addr = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+      writeByte(&cpu->memory, addr, cpu->a);
       break;
     case LDX:
       cpu->x = getByteOp(cpu, prgRom, op, cpu->pc);
       cpuSetNZ(cpu, cpu->x);
       break;
     case STX:
-      cpuWriteByte(cpu, prgRom, op, cpu->pc, cpu->x);
+      addr = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+      writeByte(&cpu->memory, addr, cpu->x);
       break;
     case LDY:
       cpu->y = getByteOp(cpu, prgRom, op, cpu->pc);
       cpuSetNZ(cpu, cpu->y);
       break;
     case STY:
-      cpuWriteByte(cpu, prgRom, op, cpu->pc, cpu->y);
+      addr = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+      writeByte(&cpu->memory, addr, cpu->y);
       break;
 
     case PHA:
@@ -267,7 +257,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
     case ADC:
       byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
-      uint8_t result = cpu->a + byteOp + (cpu->status & F_CARRY ? 1 : 0);
+      result = cpu->a + byteOp + (cpu->status & F_CARRY ? 1 : 0);
       // Set overflow if the operands' MSBs are equal and the result's MSB is
       // not the same. Can this be simplified?
       cpu->status = (cpu->status & ~F_OVERFLOW) |
@@ -276,6 +266,65 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       cpu->a = result;
       cpuSetNZ(cpu, cpu->a);
       cpu->status = (cpu->status & ~F_CARRY) | (cpu->a < byteOp ? F_CARRY : 0);
+      break;
+    case SBC:
+      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      result = cpu->a - byteOp - (cpu->status & F_CARRY ? 0 : 1);
+      cpu->status = (cpu->status & ~F_OVERFLOW) |
+          (((cpu->a ^ byteOp) & 0x80) &&
+           ((result ^ cpu->a) & 0x80) ? F_OVERFLOW : 0);
+      cpu->status = (cpu->status & ~F_CARRY) | (cpu->a >= byteOp ? F_CARRY : 0);
+      cpu->a = result;
+      cpuSetNZ(cpu, cpu->a);
+      break;
+
+    case INC:
+      cpu->a += 1;
+      cpuSetNZ(cpu, cpu->a);
+      break;
+    case INX:
+      cpu->x += 1;
+      cpuSetNZ(cpu, cpu->x);
+      break;
+    case INY:
+      cpu->y += 1;
+      cpuSetNZ(cpu, cpu->y);
+      break;
+    case DEC:
+      cpu->a -= 1;
+      cpuSetNZ(cpu, cpu->a);
+      break;
+    case DEX:
+      cpu->x -= 1;
+      cpuSetNZ(cpu, cpu->x);
+      break;
+    case DEY:
+      cpu->y -= 1;
+      cpuSetNZ(cpu, cpu->y);
+      break;
+
+    case TAX:
+      cpu->x = cpu->a;
+      cpuSetNZ(cpu, cpu->x);
+      break;
+    case TAY:
+      cpu->y = cpu->a;
+      cpuSetNZ(cpu, cpu->y);
+      break;
+    case TXA:
+      cpu->a = cpu->x;
+      cpuSetNZ(cpu, cpu->x);
+      break;
+    case TYA:
+      cpu->a = cpu->y;
+      cpuSetNZ(cpu, cpu->y);
+      break;
+    case TSX:
+      cpu->x = cpu->s;
+      cpuSetNZ(cpu, cpu->x);
+      break;
+    case TXS:
+      cpu->s = cpu->x;
       break;
 
     default:

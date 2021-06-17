@@ -31,7 +31,7 @@ int readAll(const char* filename, uint8_t **buffer) {
   fseek(f, 0, SEEK_SET);
   int read = fread(*buffer, sizeof(uint8_t), len, f);
   if (read != len) {
-    printf("read != length: %d != %d\n", read, len);
+    fprintf(stderr, "read != length: %d != %d\n", read, len);
     fclose(f);
     return -1;
   }
@@ -43,31 +43,32 @@ int readAll(const char* filename, uint8_t **buffer) {
 
 int main(int argc, char **argv) {
   if (argc != 2) {
-    printf("Usage\n");
-    printf("%s [path]\n", argv[0]);
+    fprintf(stderr, "Usage\n");
+    fprintf(stderr, "%s [path]\n", argv[0]);
     return -1;
   }
 
   uint8_t *rom = NULL;
   int romLen = readAll(argv[1], &rom);
   if (romLen < 0) {
-    printf("Error reading ROM at %s\n", argv[1]);
+    fprintf(stderr, "Error reading ROM at %s\n", argv[1]);
     free(rom);
     return -1;
   } else {
-    printf("Successfully opened ROM at %s (%d bytes).\n", argv[1], romLen);
+    fprintf(stderr, "Successfully opened ROM at %s (%d bytes).\n", argv[1],
+            romLen);
   }
 
   InesHeader header;
   if (!readInesHeader(rom, &header)) {
-    printf("Error reading iNES header.\n");
+    fprintf(stderr, "Error reading iNES header.\n");
     free(rom);
     return -1;
   } else {
-    printf("Successfully read iNES header.\n");
-    printf("PRG blocks: %d\nCHR blocks: %d\n", header.prgBlocks,
-           header.chrBlocks);
-    printf("flags6: %X\nflags7: %X\n", header.flags6, header.flags7);
+    fprintf(stderr, "Successfully read iNES header.\n");
+    fprintf(stderr, "PRG blocks: %d\nCHR blocks: %d\n", header.prgBlocks,
+            header.chrBlocks);
+    fprintf(stderr, "flags6: %X\nflags7: %X\n", header.flags6, header.flags7);
   }
 
   PrgRom *prgRom = makePrgRom(rom + prgAddr(header), prgLen(header));
@@ -83,6 +84,6 @@ int main(int argc, char **argv) {
   }
 
   free(rom);
-  printf("Goodbye!\n");
+  fprintf(stderr, "Goodbye!\n");
   return 0;
 }
