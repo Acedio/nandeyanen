@@ -34,8 +34,11 @@ uint16_t getAddrOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
     case A_ABS:
       return readWord(&cpu->memory, prgRom, pc+1);
     case A_IND:
-      pc = readWord(&cpu->memory, prgRom, pc+1);
-      return readWord(&cpu->memory, prgRom, pc);
+      addr = readWord(&cpu->memory, prgRom, pc+1);
+      // Indirect addresses wrap when read on a page boundary.
+      return readByte(&cpu->memory, prgRom, addr) |
+          (readByte(&cpu->memory, prgRom,
+                    (addr & 0xFF00) | (addr+1)&0xFF) << 8);
     case A_REL:
       return pc + 2 + (int8_t)readByte(&cpu->memory, prgRom, pc+1);
     case A_ZPG:
