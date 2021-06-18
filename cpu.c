@@ -45,6 +45,14 @@ uint16_t getAddrOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
       addr = (readByte(&cpu->memory, prgRom, pc+1) + cpu->x) & 0xFF;
       return readByte(&cpu->memory, prgRom, addr) |
           (readByte(&cpu->memory, prgRom, (addr+1)&0xFF) << 8);
+    case A_IND_Y:
+      // ZPG address of address, no carry.
+      addr = readByte(&cpu->memory, prgRom, pc+1);
+      // Get address from ZPG...
+      addr = readByte(&cpu->memory, prgRom, addr) |
+          (readByte(&cpu->memory, prgRom, (addr+1)&0xFF) << 8);
+      // ... increment by Y.
+      return addr + cpu->y;
     default:
       fprintf(stderr, "unsupported addressing mode %s for getAddrOp\n",
               addrModeName(op.addrMode));
@@ -335,8 +343,10 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
 
     case INC:
-      cpu->a += 1;
-      cpuSetNZ(cpu, cpu->a);
+      addr = getAddrOp(cpu, prgRom, op, cpu->pc);
+      result = readByte(&cpu->memory, prgRom, addr) + 1;
+      writeByte(&cpu->memory, addr, result);
+      cpuSetNZ(cpu, result);
       break;
     case INX:
       cpu->x += 1;
@@ -347,8 +357,10 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       cpuSetNZ(cpu, cpu->y);
       break;
     case DEC:
-      cpu->a -= 1;
-      cpuSetNZ(cpu, cpu->a);
+      addr = getAddrOp(cpu, prgRom, op, cpu->pc);
+      result = readByte(&cpu->memory, prgRom, addr) - 1;
+      writeByte(&cpu->memory, addr, result);
+      cpuSetNZ(cpu, result);
       break;
     case DEX:
       cpu->x -= 1;

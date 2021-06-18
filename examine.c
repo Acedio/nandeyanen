@@ -69,7 +69,12 @@ uint16_t printOp(const CpuState* cpu, const PrgRom* rom, uint16_t pc) {
       printf("($%02X%02X) ", b3, b2);
       break;
     case A_IND_Y:
-      printf("($%02X),Y", b2);
+      addr = getAddrOp(cpu, rom, op, pc);
+      // Y = addr from ZPG @ addr + Y = value
+      printf("($%02X),Y = %04X @ %04X = %02X", b2,
+             readByte(&cpu->memory, rom, b2)
+             | (readByte(&cpu->memory, rom, (b2+1)&0xFF) << 8), addr,
+             readByte(&cpu->memory, rom, addr));
       break;
     case A_REL:
       printf("$%04X      ", pc + 2 + (int8_t)b2);
