@@ -39,7 +39,7 @@ uint16_t printOp(const CpuState* cpu, const PrgRom* rom, uint16_t pc) {
   uint16_t addr = 0xF00D;
   switch (addrMode) {
     case A_ABS:
-      addr = getAddrOp(&cpu->memory, rom, op, pc);
+      addr = getAddrOp(cpu, rom, op, pc);
       if (op.op == JMP || op.op == JSR) {
         printf("$%04X      ", addr);
       } else {
@@ -47,12 +47,12 @@ uint16_t printOp(const CpuState* cpu, const PrgRom* rom, uint16_t pc) {
       }
       break;
     case A_ABS_X:
-      addr = getAddrOp(&cpu->memory, rom, op, pc);
+      addr = getAddrOp(cpu, rom, op, pc);
       printf("$%04X,X @ %04X = %02X", addr, cpu->x + addr,
             readByte(&cpu->memory, rom, addr));
       break;
     case A_ABS_Y:
-      addr = getAddrOp(&cpu->memory, rom, op, pc);
+      addr = getAddrOp(cpu, rom, op, pc);
       printf("$%04X,Y @ %04X = %02X", addr, cpu->y + addr,
             readByte(&cpu->memory, rom, addr));
       break;
@@ -75,7 +75,9 @@ uint16_t printOp(const CpuState* cpu, const PrgRom* rom, uint16_t pc) {
       printf("$%04X      ", pc + 2 + (int8_t)b2);
       break;
     case A_X_IND:
-      printf("($%02X,X)", b2);
+      addr = getAddrOp(cpu, rom, op, pc);
+      printf("($%02X,X) @ %02X = %04X = %02X", b2, (b2 + cpu->x)&0xFF, addr,
+             readByte(&cpu->memory, rom, addr));
       break;
     case A_ZPG:
       printf("$%02X = %02X   ", b2, readByte(&cpu->memory, rom, b2));

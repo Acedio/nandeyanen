@@ -33,9 +33,9 @@ void initCpu(CpuState *cpu);
 
 int step(CpuState *cpu, const PrgRom *prgRom);
 
-uint8_t getByteOp(CpuState *cpu, const PrgRom *prgRom, Operation op,
+uint8_t getByteOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
                    uint16_t pc);
-uint16_t getAddrOp(const Memory *memory, const PrgRom *prgRom, Operation op,
+uint16_t getAddrOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
                    uint16_t pc);
 
 #endif  // CPU_H

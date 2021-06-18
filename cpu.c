@@ -25,21 +25,26 @@ void initCpu(CpuState *cpu) {
   }
 }
 
-uint16_t getAddrOp(const Memory *memory, const PrgRom *prgRom, Operation op,
+uint16_t getAddrOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
                    uint16_t pc) {
   uint16_t addr = 0xF00D;
   switch (op.addrMode) {
     case A_IMM:
       return pc+1;
     case A_ABS:
-      return readWord(memory, prgRom, pc+1);
+      return readWord(&cpu->memory, prgRom, pc+1);
     case A_IND:
-      pc = readWord(memory, prgRom, pc+1);
-      return readWord(memory, prgRom, pc);
+      pc = readWord(&cpu->memory, prgRom, pc+1);
+      return readWord(&cpu->memory, prgRom, pc);
     case A_REL:
-      return pc + 2 + (int8_t)readByte(memory, prgRom, pc+1);
+      return pc + 2 + (int8_t)readByte(&cpu->memory, prgRom, pc+1);
     case A_ZPG:
-      return readByte(memory, prgRom, pc+1);
+      return readByte(&cpu->memory, prgRom, pc+1);
+    case A_X_IND:
+      // ZPG address of address, no carry.
+      addr = (readByte(&cpu->memory, prgRom, pc+1) + cpu->x) & 0xFF;
+      return readByte(&cpu->memory, prgRom, addr) |
+          (readByte(&cpu->memory, prgRom, (addr+1)&0xFF) << 8);
     default:
       fprintf(stderr, "unsupported addressing mode %s for getAddrOp\n",
               addrModeName(op.addrMode));
@@ -47,9 +52,9 @@ uint16_t getAddrOp(const Memory *memory, const PrgRom *prgRom, Operation op,
   }
 }
 
-uint8_t getByteOp(CpuState *cpu, const PrgRom *prgRom, Operation op,
+uint8_t getByteOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
                   uint16_t pc) {
-  uint16_t addr = getAddrOp(&cpu->memory, prgRom, op, pc);
+  uint16_t addr = getAddrOp(cpu, prgRom, op, pc);
   return readByte(&cpu->memory, prgRom, addr);
 }
 
@@ -90,7 +95,7 @@ void shiftOp(CpuState *cpu, const PrgRom *prgRom, Operation op, uint16_t pc) {
   if (op.addrMode == A_ACC) {
     byte = cpu->a;
   } else {
-    addr = getAddrOp(&cpu->memory, prgRom, op, pc);
+    addr = getAddrOp(cpu, prgRom, op, pc);
     byte = readByte(&cpu->memory, prgRom, addr);
   }
 
@@ -153,11 +158,11 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
 
     case JMP:
-      nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+      nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
       break;
     case JSR:
       cpuStackPushWord(cpu, cpu->pc + 2);
-      nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+      nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
       break;
     case RTS:
       nextPc = cpuStackPopWord(cpu) + 1;
@@ -169,42 +174,42 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
 
     case BCC:
       if (!(cpu->status & F_CARRY)) {
-        nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
       }
       break;
     case BCS:
       if (cpu->status & F_CARRY) {
-        nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
       }
       break;
     case BEQ:
       if (cpu->status & F_ZERO) {
-        nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
       }
       break;
     case BNE:
       if (!(cpu->status & F_ZERO)) {
-        nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
       }
       break;
     case BMI:
       if (cpu->status & F_NEGATIVE) {
-        nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
       }
       break;
     case BPL:
       if (!(cpu->status & F_NEGATIVE)) {
-        nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
       }
       break;
     case BVS:
       if (cpu->status & F_OVERFLOW) {
-        nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
       }
       break;
     case BVC:
       if (!(cpu->status & F_OVERFLOW)) {
-        nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
       }
       break;
 
@@ -213,7 +218,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       cpuSetNZ(cpu, cpu->a);
       break;
     case STA:
-      addr = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+      addr = getAddrOp(cpu, prgRom, op, cpu->pc);
       writeByte(&cpu->memory, addr, cpu->a);
       break;
     case LDX:
@@ -221,7 +226,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       cpuSetNZ(cpu, cpu->x);
       break;
     case STX:
-      addr = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+      addr = getAddrOp(cpu, prgRom, op, cpu->pc);
       writeByte(&cpu->memory, addr, cpu->x);
       break;
     case LDY:
@@ -229,7 +234,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       cpuSetNZ(cpu, cpu->y);
       break;
     case STY:
-      addr = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
+      addr = getAddrOp(cpu, prgRom, op, cpu->pc);
       writeByte(&cpu->memory, addr, cpu->y);
       break;
 

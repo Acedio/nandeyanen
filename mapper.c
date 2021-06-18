@@ -30,7 +30,7 @@ uint8_t readByte(const Memory *memory, const PrgRom *prgRom, uint16_t addr) {
 uint16_t readWord(const Memory *memory, const PrgRom *prgRom, uint16_t addr) {
   uint16_t word = readByte(memory, prgRom, addr+1);
   word <<= 8;
-  word += readByte(memory, prgRom, addr);
+  word |= readByte(memory, prgRom, addr);
   return word;
 }
 
