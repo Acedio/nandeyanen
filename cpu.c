@@ -80,6 +80,53 @@ void cpuSetNZ(CpuState *cpu, uint8_t result) {
   cpu->status = n | z | (cpu->status & ~(F_NEGATIVE | F_ZERO));
 }
 
+// Shift operations are weird in that they're the only ones that use the
+// "accumulator" addressing mode. Seems to me like they should just use separate
+// opcodes :P
+void shiftOp(CpuState *cpu, const PrgRom *prgRom, Operation op, uint16_t pc) {
+  uint16_t addr;
+  uint8_t byte;
+
+  if (op.addrMode == A_ACC) {
+    byte = cpu->a;
+  } else {
+    addr = getAddrOp(&cpu->memory, prgRom, op, pc);
+    byte = readByte(&cpu->memory, prgRom, addr);
+  }
+
+  uint8_t carry = cpu->status & F_CARRY;
+
+  switch (op.op) {
+    case ASL:
+      cpu->status = (cpu->status & ~F_CARRY) | (byte & 0x80 ? F_CARRY : 0);
+      byte <<= 1;
+      break;
+    case LSR:
+      cpu->status = (cpu->status & ~F_CARRY) | (byte & 0x01 ? F_CARRY : 0);
+      byte >>= 1;
+      break;
+    case ROL:
+      cpu->status = (cpu->status & ~F_CARRY) | (byte & 0x80 ? F_CARRY : 0);
+      byte = (byte << 1) | (carry ? 0x01 : 0);
+      break;
+    case ROR:
+      cpu->status = (cpu->status & ~F_CARRY) | (byte & 0x01 ? F_CARRY : 0);
+      byte = (byte >> 1) | (carry ? 0x80 : 0);
+      break;
+    default:
+      fprintf(stderr, "unsupported shift op %s\n", opName(op.op));
+      assert(0);
+  }
+
+  cpuSetNZ(cpu, byte);
+  
+  if (op.addrMode == A_ACC) {
+    cpu->a = byte;
+  } else {
+    writeByte(&cpu->memory, addr, byte);
+  }
+}
+
 int step(CpuState *cpu, const PrgRom *prgRom) {
   assert(cpu);
   assert(prgRom);
@@ -109,11 +156,15 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
       break;
     case JSR:
-      cpuStackPushWord(cpu, nextPc - 1);
+      cpuStackPushWord(cpu, cpu->pc + 2);
       nextPc = getAddrOp(&cpu->memory, prgRom, op, cpu->pc);
       break;
     case RTS:
       nextPc = cpuStackPopWord(cpu) + 1;
+      break;
+    case RTI:
+      cpu->status = (cpu->status & 0x30) | (cpuStackPop(cpu) & ~0x30);
+      nextPc = cpuStackPopWord(cpu);
       break;
 
     case BCC:
@@ -301,6 +352,13 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
     case DEY:
       cpu->y -= 1;
       cpuSetNZ(cpu, cpu->y);
+      break;
+
+    case ASL:
+    case LSR:
+    case ROL:
+    case ROR:
+      shiftOp(cpu, prgRom, op, cpu->pc);
       break;
 
     case TAX:
