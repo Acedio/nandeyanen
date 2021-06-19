@@ -150,26 +150,6 @@ void shiftOp(CpuState *cpu, const PrgRom *prgRom, Operation op, uint16_t pc) {
   }
 }
 
-int opClocks(int addrMode) {
-  int clocks = opLen(addrMode);
-  switch (addrMode) {
-    case A_ABS: return clocks + 1;
-    case A_ABS_X: return clocks + 2;
-    case A_ABS_Y: return clocks + 2;
-    case A_ACC: return clocks;
-    case A_IMM: return clocks;
-    case A_IMPL: return clocks;
-    case A_IND: return clocks + 2;
-    case A_IND_Y: return clocks + 3;
-    case A_REL: return clocks;
-    case A_X_IND: return clocks + 4;
-    case A_ZPG: return clocks + 2;
-    case A_ZPG_X: return clocks + 1;
-    case A_ZPG_Y: return clocks + 2;
-    default: return -1;
-  }
-}
-
 int step(CpuState *cpu, const PrgRom *prgRom) {
   assert(cpu);
   assert(prgRom);
@@ -186,9 +166,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
 
   // Instructions take one clock per byte read or written, as a base.
   // (from awesome resource at https://llx.com/Neil/a2/opcodes.html)
-  int clocksTaken = opClocks(op.addrMode);
-  // One-cycle instructions still take two cycles.
-  if (clocksTaken < 2) clocksTaken = 2;
+  int clocksTaken = op.cycles;
 
   uint16_t nextPc = cpu->pc + opLen(op.addrMode);
 
@@ -203,8 +181,6 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
 
     case JMP:
       nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
-      // TODO
-      clocksTaken -= 1;
       break;
     case JSR:
       cpuStackPushWord(cpu, cpu->pc + 2);
