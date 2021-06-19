@@ -30,6 +30,8 @@ enum AddrMode {
 typedef struct {
   int op;
   int addrMode;
+  int byteLen;
+  int cycles;
 } Operation;
 
 extern const Operation opcodes[256];

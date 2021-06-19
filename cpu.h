@@ -26,6 +26,9 @@ typedef struct {
   uint8_t s;
   uint8_t status;
 
+  int cycle;
+  int scanline;
+
   Memory memory;
 } CpuState;
 

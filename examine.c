@@ -118,8 +118,8 @@ uint16_t printOps(const CpuState *cpu, const PrgRom* rom, uint16_t pc, int numOp
 }
 
 void printCpuState(const CpuState *cpu) {
-  printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X", cpu->a, cpu->x, cpu->y,
-         cpu->status, cpu->s);
+  printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%3d SL:%d", cpu->a, cpu->x,
+         cpu->y, cpu->status, cpu->s, cpu->cycle, cpu->scanline);
 }
 
 uint16_t printState(const CpuState *cpu, const PrgRom *rom, uint16_t pc) {

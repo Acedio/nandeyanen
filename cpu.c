@@ -8,6 +8,9 @@
 #include "mapper.h"
 #include "examine.h"
 
+#define CYCLES_PER_SCANLINE 341
+#define SCANLINES_PER_VSYNC 261
+
 void initCpu(CpuState *cpu) {
   assert(cpu);
   // http://wiki.nesdev.com/w/index.php/CPU_power_up_state
@@ -19,6 +22,10 @@ void initCpu(CpuState *cpu) {
   cpu->s = 0xfd;
   // TODO: This should actually be 0x34 but for the tests bit 0x10 is not set.
   cpu->status = 0x24;
+
+  cpu->cycle = 0;
+  // TODO: Why does this start at 241?
+  cpu->scanline = 241;
 
   for (int i = 0; i < sizeof(cpu->memory); ++i) {
     cpu->memory.memory[i] = 0x00;
@@ -143,6 +150,26 @@ void shiftOp(CpuState *cpu, const PrgRom *prgRom, Operation op, uint16_t pc) {
   }
 }
 
+int opClocks(int addrMode) {
+  int clocks = opLen(addrMode);
+  switch (addrMode) {
+    case A_ABS: return clocks + 1;
+    case A_ABS_X: return clocks + 2;
+    case A_ABS_Y: return clocks + 2;
+    case A_ACC: return clocks;
+    case A_IMM: return clocks;
+    case A_IMPL: return clocks;
+    case A_IND: return clocks + 2;
+    case A_IND_Y: return clocks + 3;
+    case A_REL: return clocks;
+    case A_X_IND: return clocks + 4;
+    case A_ZPG: return clocks + 2;
+    case A_ZPG_X: return clocks + 1;
+    case A_ZPG_Y: return clocks + 2;
+    default: return -1;
+  }
+}
+
 int step(CpuState *cpu, const PrgRom *prgRom) {
   assert(cpu);
   assert(prgRom);
@@ -157,6 +184,12 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
 
   printState(cpu, prgRom, cpu->pc);
 
+  // Instructions take one clock per byte read or written, as a base.
+  // (from awesome resource at https://llx.com/Neil/a2/opcodes.html)
+  int clocksTaken = opClocks(op.addrMode);
+  // One-cycle instructions still take two cycles.
+  if (clocksTaken < 2) clocksTaken = 2;
+
   uint16_t nextPc = cpu->pc + opLen(op.addrMode);
 
   // A few intermediary variables to use below.
@@ -170,6 +203,8 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
 
     case JMP:
       nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+      // TODO
+      clocksTaken -= 1;
       break;
     case JSR:
       cpuStackPushWord(cpu, cpu->pc + 2);
@@ -186,41 +221,57 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
     case BCC:
       if (!(cpu->status & F_CARRY)) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        clocksTaken += 1;
+        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
       }
       break;
     case BCS:
       if (cpu->status & F_CARRY) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        clocksTaken += 1;
+        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
       }
       break;
     case BEQ:
       if (cpu->status & F_ZERO) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        clocksTaken += 1;
+        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
       }
       break;
     case BNE:
       if (!(cpu->status & F_ZERO)) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        clocksTaken += 1;
+        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
       }
       break;
     case BMI:
       if (cpu->status & F_NEGATIVE) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        clocksTaken += 1;
+        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
       }
       break;
     case BPL:
       if (!(cpu->status & F_NEGATIVE)) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        clocksTaken += 1;
+        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
       }
       break;
     case BVS:
       if (cpu->status & F_OVERFLOW) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        clocksTaken += 1;
+        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
       }
       break;
     case BVC:
       if (!(cpu->status & F_OVERFLOW)) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        clocksTaken += 1;
+        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
       }
       break;
 
@@ -408,6 +459,15 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
     default:
       printf("unsupported op %s\n", opName(op.op));
       return 0;
+  }
+
+  cpu->cycle += clocksTaken * 3;
+  if (cpu->cycle >= CYCLES_PER_SCANLINE) {
+    cpu->cycle -= CYCLES_PER_SCANLINE;
+    cpu->scanline += 1;
+    if (cpu->scanline >= SCANLINES_PER_VSYNC) {
+      cpu->scanline = -1;
+    }
   }
 
   cpu->pc = nextPc;
