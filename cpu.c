@@ -150,6 +150,10 @@ void shiftOp(CpuState *cpu, const PrgRom *prgRom, Operation op, uint16_t pc) {
   }
 }
 
+int isSamePage(uint16_t a, uint16_t b) {
+  return (a & 0xFF00) == (b & 0xFF00);
+}
+
 int step(CpuState *cpu, const PrgRom *prgRom) {
   assert(cpu);
   assert(prgRom);
@@ -198,56 +202,56 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       if (!(cpu->status & F_CARRY)) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
         clocksTaken += 1;
-        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
+        if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BCS:
       if (cpu->status & F_CARRY) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
         clocksTaken += 1;
-        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
+        if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BEQ:
       if (cpu->status & F_ZERO) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
         clocksTaken += 1;
-        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
+        if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BNE:
       if (!(cpu->status & F_ZERO)) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
         clocksTaken += 1;
-        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
+        if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BMI:
       if (cpu->status & F_NEGATIVE) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
         clocksTaken += 1;
-        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
+        if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BPL:
       if (!(cpu->status & F_NEGATIVE)) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
         clocksTaken += 1;
-        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
+        if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BVS:
       if (cpu->status & F_OVERFLOW) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
         clocksTaken += 1;
-        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
+        if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BVC:
       if (!(cpu->status & F_OVERFLOW)) {
         nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
         clocksTaken += 1;
-        if (nextPc & 0xFF00 != cpu->pc) clocksTaken += 1;
+        if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
 
