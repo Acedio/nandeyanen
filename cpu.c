@@ -33,31 +33,31 @@ void initCpu(CpuState *cpu) {
 }
 
 uint16_t getAddrOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
-                   uint16_t pc) {
+                   uint16_t insAddr) {
   uint16_t addr = 0xF00D;
   switch (op.addrMode) {
     case A_IMM:
-      return pc+1;
+      return insAddr+1;
     case A_ABS:
-      return readWord(&cpu->memory, prgRom, pc+1);
+      return readWord(&cpu->memory, prgRom, insAddr+1);
     case A_IND:
-      addr = readWord(&cpu->memory, prgRom, pc+1);
+      addr = readWord(&cpu->memory, prgRom, insAddr+1);
       // Indirect addresses wrap when read on a page boundary.
       return readByte(&cpu->memory, prgRom, addr) |
           (readByte(&cpu->memory, prgRom,
                     (addr & 0xFF00) | (addr+1)&0xFF) << 8);
     case A_REL:
-      return pc + 2 + (int8_t)readByte(&cpu->memory, prgRom, pc+1);
+      return cpu->pc + (int8_t)readByte(&cpu->memory, prgRom, insAddr+1);
     case A_ZPG:
-      return readByte(&cpu->memory, prgRom, pc+1);
+      return readByte(&cpu->memory, prgRom, insAddr+1);
     case A_X_IND:
       // ZPG address of address, no carry.
-      addr = (readByte(&cpu->memory, prgRom, pc+1) + cpu->x) & 0xFF;
+      addr = (readByte(&cpu->memory, prgRom, insAddr+1) + cpu->x) & 0xFF;
       return readByte(&cpu->memory, prgRom, addr) |
           (readByte(&cpu->memory, prgRom, (addr+1)&0xFF) << 8);
     case A_IND_Y:
       // ZPG address of address, no carry.
-      addr = readByte(&cpu->memory, prgRom, pc+1);
+      addr = readByte(&cpu->memory, prgRom, insAddr+1);
       // Get address from ZPG...
       addr = readByte(&cpu->memory, prgRom, addr) |
           (readByte(&cpu->memory, prgRom, (addr+1)&0xFF) << 8);
@@ -71,8 +71,8 @@ uint16_t getAddrOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
 }
 
 uint8_t getByteOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
-                  uint16_t pc) {
-  uint16_t addr = getAddrOp(cpu, prgRom, op, pc);
+                  uint16_t insAddr) {
+  uint16_t addr = getAddrOp(cpu, prgRom, op, insAddr);
   return readByte(&cpu->memory, prgRom, addr);
 }
 
@@ -106,14 +106,15 @@ void cpuSetNZ(CpuState *cpu, uint8_t result) {
 // Shift operations are weird in that they're the only ones that use the
 // "accumulator" addressing mode. Seems to me like they should just use separate
 // opcodes :P
-void shiftOp(CpuState *cpu, const PrgRom *prgRom, Operation op, uint16_t pc) {
+void shiftOp(CpuState *cpu, const PrgRom *prgRom, Operation op,
+             uint16_t insAddr) {
   uint16_t addr;
   uint8_t byte;
 
   if (op.addrMode == A_ACC) {
     byte = cpu->a;
   } else {
-    addr = getAddrOp(cpu, prgRom, op, pc);
+    addr = getAddrOp(cpu, prgRom, op, insAddr);
     byte = readByte(&cpu->memory, prgRom, addr);
   }
 
@@ -172,7 +173,9 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
   // (from awesome resource at https://llx.com/Neil/a2/opcodes.html)
   int clocksTaken = op.cycles;
 
-  uint16_t nextPc = cpu->pc + opLen(op.addrMode);
+  uint16_t insAddr = cpu->pc;
+  cpu->pc += opLen(op.addrMode);
+  uint16_t nextPc = cpu->pc;
 
   // A few intermediary variables to use below.
   uint16_t addr;
@@ -184,11 +187,12 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
 
     case JMP:
-      nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+      nextPc = getAddrOp(cpu, prgRom, op, insAddr);
       break;
     case JSR:
-      cpuStackPushWord(cpu, cpu->pc + 2);
-      nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+      // TODO: Why do we push the address that's in the _middle_ of the dest??
+      cpuStackPushWord(cpu, cpu->pc - 1);
+      nextPc = getAddrOp(cpu, prgRom, op, insAddr);
       break;
     case RTS:
       nextPc = cpuStackPopWord(cpu) + 1;
@@ -200,83 +204,83 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
 
     case BCC:
       if (!(cpu->status & F_CARRY)) {
-        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, insAddr);
         clocksTaken += 1;
         if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BCS:
       if (cpu->status & F_CARRY) {
-        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, insAddr);
         clocksTaken += 1;
         if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BEQ:
       if (cpu->status & F_ZERO) {
-        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, insAddr);
         clocksTaken += 1;
         if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BNE:
       if (!(cpu->status & F_ZERO)) {
-        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, insAddr);
         clocksTaken += 1;
         if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BMI:
       if (cpu->status & F_NEGATIVE) {
-        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, insAddr);
         clocksTaken += 1;
         if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BPL:
       if (!(cpu->status & F_NEGATIVE)) {
-        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, insAddr);
         clocksTaken += 1;
         if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BVS:
       if (cpu->status & F_OVERFLOW) {
-        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, insAddr);
         clocksTaken += 1;
         if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
     case BVC:
       if (!(cpu->status & F_OVERFLOW)) {
-        nextPc = getAddrOp(cpu, prgRom, op, cpu->pc);
+        nextPc = getAddrOp(cpu, prgRom, op, insAddr);
         clocksTaken += 1;
         if (!isSamePage(nextPc, cpu->pc)) clocksTaken += 1;
       }
       break;
 
     case LDA:
-      cpu->a = getByteOp(cpu, prgRom, op, cpu->pc);
+      cpu->a = getByteOp(cpu, prgRom, op, insAddr);
       cpuSetNZ(cpu, cpu->a);
       break;
     case STA:
-      addr = getAddrOp(cpu, prgRom, op, cpu->pc);
+      addr = getAddrOp(cpu, prgRom, op, insAddr);
       writeByte(&cpu->memory, addr, cpu->a);
       break;
     case LDX:
-      cpu->x = getByteOp(cpu, prgRom, op, cpu->pc);
+      cpu->x = getByteOp(cpu, prgRom, op, insAddr);
       cpuSetNZ(cpu, cpu->x);
       break;
     case STX:
-      addr = getAddrOp(cpu, prgRom, op, cpu->pc);
+      addr = getAddrOp(cpu, prgRom, op, insAddr);
       writeByte(&cpu->memory, addr, cpu->x);
       break;
     case LDY:
-      cpu->y = getByteOp(cpu, prgRom, op, cpu->pc);
+      cpu->y = getByteOp(cpu, prgRom, op, insAddr);
       cpuSetNZ(cpu, cpu->y);
       break;
     case STY:
-      addr = getAddrOp(cpu, prgRom, op, cpu->pc);
+      addr = getAddrOp(cpu, prgRom, op, insAddr);
       writeByte(&cpu->memory, addr, cpu->y);
       break;
 
@@ -297,24 +301,24 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
 
     case BIT:
-      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      byteOp = getByteOp(cpu, prgRom, op, insAddr);
       uint8_t z = byteOp & cpu->a ? 0 : F_ZERO;
       // Copy N and V to status flags.
       cpu->status = (byteOp & (F_OVERFLOW | F_NEGATIVE)) | z |
                     (cpu->status & ~(F_OVERFLOW | F_NEGATIVE | F_ZERO));
       break;
     case CMP:
-      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      byteOp = getByteOp(cpu, prgRom, op, insAddr);
       cpuSetNZ(cpu, cpu->a - byteOp);
       cpu->status = (cpu->status & ~F_CARRY) | (cpu->a >= byteOp ? F_CARRY : 0);
       break;
     case CPX:
-      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      byteOp = getByteOp(cpu, prgRom, op, insAddr);
       cpuSetNZ(cpu, cpu->x - byteOp);
       cpu->status = (cpu->status & ~F_CARRY) | (cpu->x >= byteOp ? F_CARRY : 0);
       break;
     case CPY:
-      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      byteOp = getByteOp(cpu, prgRom, op, insAddr);
       cpuSetNZ(cpu, cpu->y - byteOp);
       cpu->status = (cpu->status & ~F_CARRY) | (cpu->y >= byteOp ? F_CARRY : 0);
       break;
@@ -342,19 +346,19 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
 
     case AND:
-      cpu->a &= getByteOp(cpu, prgRom, op, cpu->pc);
+      cpu->a &= getByteOp(cpu, prgRom, op, insAddr);
       cpuSetNZ(cpu, cpu->a);
       break;
     case ORA:
-      cpu->a |= getByteOp(cpu, prgRom, op, cpu->pc);
+      cpu->a |= getByteOp(cpu, prgRom, op, insAddr);
       cpuSetNZ(cpu, cpu->a);
       break;
     case EOR:
-      cpu->a ^= getByteOp(cpu, prgRom, op, cpu->pc);
+      cpu->a ^= getByteOp(cpu, prgRom, op, insAddr);
       cpuSetNZ(cpu, cpu->a);
       break;
     case ADC:
-      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      byteOp = getByteOp(cpu, prgRom, op, insAddr);
       result = cpu->a + byteOp + (cpu->status & F_CARRY ? 1 : 0);
       // Set overflow if the operands' MSBs are equal and the result's MSB is
       // not the same. Can this be simplified?
@@ -366,7 +370,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       cpu->status = (cpu->status & ~F_CARRY) | (cpu->a < byteOp ? F_CARRY : 0);
       break;
     case SBC:
-      byteOp = getByteOp(cpu, prgRom, op, cpu->pc);
+      byteOp = getByteOp(cpu, prgRom, op, insAddr);
       result = cpu->a - byteOp - (cpu->status & F_CARRY ? 0 : 1);
       cpu->status = (cpu->status & ~F_OVERFLOW) |
           (((cpu->a ^ byteOp) & 0x80) &&
@@ -377,7 +381,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       break;
 
     case INC:
-      addr = getAddrOp(cpu, prgRom, op, cpu->pc);
+      addr = getAddrOp(cpu, prgRom, op, insAddr);
       result = readByte(&cpu->memory, prgRom, addr) + 1;
       writeByte(&cpu->memory, addr, result);
       cpuSetNZ(cpu, result);
@@ -391,7 +395,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
       cpuSetNZ(cpu, cpu->y);
       break;
     case DEC:
-      addr = getAddrOp(cpu, prgRom, op, cpu->pc);
+      addr = getAddrOp(cpu, prgRom, op, insAddr);
       result = readByte(&cpu->memory, prgRom, addr) - 1;
       writeByte(&cpu->memory, addr, result);
       cpuSetNZ(cpu, result);
@@ -409,7 +413,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
     case LSR:
     case ROL:
     case ROR:
-      shiftOp(cpu, prgRom, op, cpu->pc);
+      shiftOp(cpu, prgRom, op, insAddr);
       break;
 
     case TAX:
