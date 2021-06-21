@@ -155,6 +155,27 @@ int isSamePage(uint16_t a, uint16_t b) {
   return (a & 0xFF00) == (b & 0xFF00);
 }
 
+int indexingCrossesBoundary(
+    const CpuState *cpu, const PrgRom *prgRom, Operation op, uint16_t insAddr) {
+  uint16_t addr = 0xF00D;
+  switch (op.addrMode) {
+    case A_ABS_X:
+    case A_ABS_Y:
+      // TODO
+      assert(0);
+    case A_IND_Y:
+      // ZPG address of address, no carry.
+      addr = readByte(&cpu->memory, prgRom, insAddr+1);
+      // Get address from ZPG...
+      addr = readByte(&cpu->memory, prgRom, addr) |
+          (readByte(&cpu->memory, prgRom, (addr+1)&0xFF) << 8);
+      // ... increment by Y.
+      return !isSamePage(addr, addr + cpu->y);
+    default:
+      return 0;
+  }
+}
+
 int step(CpuState *cpu, const PrgRom *prgRom) {
   assert(cpu);
   assert(prgRom);
@@ -176,6 +197,10 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
   uint16_t insAddr = cpu->pc;
   cpu->pc += opLen(op.addrMode);
   uint16_t nextPc = cpu->pc;
+
+  if (indexingCrossesBoundary(cpu, prgRom, op, insAddr)) {
+    clocksTaken += 1;
+  }
 
   // A few intermediary variables to use below.
   uint16_t addr;
