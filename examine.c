@@ -50,12 +50,12 @@ uint16_t printOp(const CpuState* cpu, const PrgRom* rom, uint16_t pc) {
       break;
     case A_ABS_X:
       addr = getAddrOp(cpu, rom, op, pc);
-      snprintf(opStr, sizeof(opStr), "$%04X,X @ %04X = %02X", addr, cpu->x + addr,
+      snprintf(opStr, sizeof(opStr), "$%02X%02X,X @ %04X = %02X", b3, b2, addr,
             readByte(&cpu->memory, rom, addr));
       break;
     case A_ABS_Y:
       addr = getAddrOp(cpu, rom, op, pc);
-      snprintf(opStr, sizeof(opStr), "$%04X,Y @ %04X = %02X", addr, cpu->y + addr,
+      snprintf(opStr, sizeof(opStr), "$%02X%02X,Y @ %04X = %02X", b3, b2, addr,
             readByte(&cpu->memory, rom, addr));
       break;
     case A_ACC:
@@ -68,7 +68,8 @@ uint16_t printOp(const CpuState* cpu, const PrgRom* rom, uint16_t pc) {
       snprintf(opStr, sizeof(opStr), "");
       break;
     case A_IND:
-      snprintf(opStr, sizeof(opStr), "($%02X%02X) ", b3, b2);
+      addr = getAddrOp(cpu, rom, op, pc);
+      snprintf(opStr, sizeof(opStr), "($%02X%02X) = %04X", b3, b2, addr);
       break;
     case A_IND_Y:
       addr = getAddrOp(cpu, rom, op, pc);
@@ -90,10 +91,14 @@ uint16_t printOp(const CpuState* cpu, const PrgRom* rom, uint16_t pc) {
       snprintf(opStr, sizeof(opStr), "$%02X = %02X", b2, readByte(&cpu->memory, rom, b2));
       break;
     case A_ZPG_X:
-      snprintf(opStr, sizeof(opStr), "$%02X,X", b2);
+      addr = getAddrOp(cpu, rom, op, pc);
+      snprintf(opStr, sizeof(opStr), "$%02X,X @ %02X = %02X", b2, addr,
+               readByte(&cpu->memory, rom, addr));
       break;
     case A_ZPG_Y:
-      snprintf(opStr, sizeof(opStr), "$%02X,Y", b2);
+      addr = getAddrOp(cpu, rom, op, pc);
+      snprintf(opStr, sizeof(opStr), "$%02X,Y @ %02X = %02X", b2, addr,
+               readByte(&cpu->memory, rom, addr));
       break;
     default:
       snprintf(opStr, sizeof(opStr), "Unsupported address mode!\n");

@@ -40,6 +40,10 @@ uint16_t getAddrOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
       return insAddr+1;
     case A_ABS:
       return readWord(&cpu->memory, prgRom, insAddr+1);
+    case A_ABS_X:
+      return readWord(&cpu->memory, prgRom, insAddr+1) + cpu->x;
+    case A_ABS_Y:
+      return readWord(&cpu->memory, prgRom, insAddr+1) + cpu->y;
     case A_IND:
       addr = readWord(&cpu->memory, prgRom, insAddr+1);
       // Indirect addresses wrap when read on a page boundary.
@@ -50,6 +54,10 @@ uint16_t getAddrOp(const CpuState *cpu, const PrgRom *prgRom, Operation op,
       return cpu->pc + (int8_t)readByte(&cpu->memory, prgRom, insAddr+1);
     case A_ZPG:
       return readByte(&cpu->memory, prgRom, insAddr+1);
+    case A_ZPG_X:
+      return (readByte(&cpu->memory, prgRom, insAddr+1) + cpu->x) & 0xFF;
+    case A_ZPG_Y:
+      return (readByte(&cpu->memory, prgRom, insAddr+1) + cpu->y) & 0xFF;
     case A_X_IND:
       // ZPG address of address, no carry.
       addr = (readByte(&cpu->memory, prgRom, insAddr+1) + cpu->x) & 0xFF;
@@ -160,9 +168,11 @@ int indexingCrossesBoundary(
   uint16_t addr = 0xF00D;
   switch (op.addrMode) {
     case A_ABS_X:
+      addr = readByte(&cpu->memory, prgRom, insAddr+1);
+      return !isSamePage(addr, addr + cpu->x);
     case A_ABS_Y:
-      // TODO
-      assert(0);
+      addr = readByte(&cpu->memory, prgRom, insAddr+1);
+      return !isSamePage(addr, addr + cpu->y);
     case A_IND_Y:
       // ZPG address of address, no carry.
       addr = readByte(&cpu->memory, prgRom, insAddr+1);
@@ -198,7 +208,7 @@ int step(CpuState *cpu, const PrgRom *prgRom) {
   cpu->pc += opLen(op.addrMode);
   uint16_t nextPc = cpu->pc;
 
-  if (indexingCrossesBoundary(cpu, prgRom, op, insAddr)) {
+  if (indexingCrossesBoundary(cpu, prgRom, op, insAddr) && op.op != STA) {
     clocksTaken += 1;
   }
 
